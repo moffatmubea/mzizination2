@@ -44,11 +44,17 @@ RUN chmod +x /entrypoint.sh
 COPY --from=builder /app /app
 COPY . /app
 WORKDIR /app
-# Create necessary directories
+
+# Generate APP_KEY if not present
+RUN php artisan key:generate --force || true
+
+# Create necessary directories and set permissions
 RUN mkdir -p storage/logs storage/cache bootstrap/cache \
-    && chown -R www-data:www-data /app/storage /app/bootstrap
+    && chown -R www-data:www-data /app/storage /app/bootstrap /app
+
 # Expose port
 EXPOSE 8000
+
 # Start supervisor (which manages nginx + php-fpm)
 ENTRYPOINT ["/entrypoint.sh"]
 CMD []
