@@ -1,67 +1,54 @@
-# Build stage
-FROM php:8.2-fpm as builder
-
-WORKDIR /app
-
+# Multi-stage build for Mzizination
+# Stage 1: Build stage
+FROM php:8.2-fpm-alpine as builder
 # Install system dependencies
-RUN apt-get update && apt-get install -y \
-    git \
+RUN apk add --no-cache \
     curl \
-    libonig-dev \
-    libxml2-dev \
+    git \
     libpq-dev \
-    unzip \
-    && docker-php-ext-install pdo pdo_mysql pdo_pgsql bcmath \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy Composer from official image
+    postgresql-client \
+    zip \
+    unzip
+# Install PHP extensions
+RUN docker-php-ext-install pdo pdo_pgsql
+# Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
-
-# Set working directory and copy composer files
-COPY composer.json composer.lock* ./
-
-# Install PHP dependencies (use install, not update)
-RUN composer install \
-    --no-dev \
-    --no-interaction \
-    --prefer-dist \
-    --optimize-autoloader \
-    --no-scripts
-
-# Copy entire application
-COPY . .
-
-# Run Laravel package discovery
-RUN php artisan package:discover --ansi
-
-# Runtime stage
-FROM php:8.2-fpm
-
 WORKDIR /app
-
-# Install runtime system dependencies
-RUN apt-get update && apt-get install -y \
-    git \
+# Copy composer files
+COPY composer.json composer.lock* ./
+# Install PHP dependencies
+# Use composer update to regenerate lock file if composer.json was updated
+RUN composer update --no-interaction --prefer-dist --optimize-autoloader
+# Stage 2: Runtime stage
+FROM php:8.2-fpm-alpine
+# Install runtime dependencies
+# IMPORTANT: postgresql-dev is needed to compile pdo_pgsql
+RUN apk add --no-cache \
     curl \
-    libonig-dev \
-    libxml2-dev \
+    libpq \
     libpq-dev \
-    && docker-php-ext-install pdo pdo_mysql pdo_pgsql bcmath \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy built application from builder
-COPY --from=builder /app /app
-
-# Copy PHP configurations
+    nginx \
+    supervisor
+# Install PHP extensions
+RUN docker-php-ext-install pdo pdo_pgsql
+# Copy PHP configuration
 COPY docker/php.ini /usr/local/etc/php/php.ini
 COPY docker/www.conf /usr/local/etc/php-fpm.d/www.conf
-
-# Set proper permissions
-RUN chown -R www-data:www-data /app/storage /app/bootstrap/cache && \
-    chmod -R 755 /app/storage /app/bootstrap/cache
-
+# Copy nginx and supervisor configs
+COPY docker/nginx.conf /etc/nginx/nginx.conf
+COPY docker/supervisord.conf /etc/supervisor/supervisord.conf
+# Copy entrypoint script
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+# Copy application
+COPY --from=builder /app /app
+COPY . /app
+WORKDIR /app
+# Create necessary directories
+RUN mkdir -p storage/logs storage/cache bootstrap/cache \
+    && chown -R www-data:www-data /app/storage /app/bootstrap
 # Expose port
-EXPOSE 9000
-
-# Start PHP-FPM
-CMD ["php-fpm"]
+EXPOSE 8000
+# Start supervisor (which manages nginx + php-fpm)
+ENTRYPOINT ["/entrypoint.sh"]
+CMD []
