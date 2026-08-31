@@ -1,5 +1,4 @@
 # Multi-stage build for Mzizination
-
 # Stage 1: Build stage
 FROM php:8.2-fpm-alpine as builder
 
@@ -30,11 +29,13 @@ RUN composer install --no-interaction --prefer-dist --optimize-autoloader
 FROM php:8.2-fpm-alpine
 
 # Install runtime dependencies
+# IMPORTANT: postgresql-dev is needed to compile pdo_pgsql
 RUN apk add --no-cache \
+    curl \
     libpq \
+    libpq-dev \
     nginx \
-    supervisor \
-    curl
+    supervisor
 
 # Install PHP extensions
 RUN docker-php-ext-install pdo pdo_pgsql
@@ -55,7 +56,7 @@ RUN mkdir -p storage/logs storage/cache bootstrap/cache \
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost/api/health || exit 1
+    CMD curl -f http://localhost/health || exit 1
 
 # Expose port
 EXPOSE 8000
