@@ -23,7 +23,8 @@ WORKDIR /app
 COPY composer.json composer.lock* ./
 
 # Install PHP dependencies
-RUN composer install --no-interaction --prefer-dist --optimize-autoloader
+# Use composer update to regenerate lock file if composer.json was updated
+RUN composer update --no-interaction --prefer-dist --optimize-autoloader
 
 # Stage 2: Runtime stage
 FROM php:8.2-fpm-alpine
