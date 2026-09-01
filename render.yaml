@@ -10,23 +10,18 @@ services:
     name: mzizination-casino
     env: php
     phpVersion: 8.2
-    
-    # ⚠️ CRITICAL FIX: Use Render's native PHP + nginx setup
-    # DO NOT use startCommand: "sh scripts/start.sh" - Render ignores it
-    # Instead, Render will automatically start nginx + php-fpm
-    
     buildCommand: "sh scripts/build.sh"
     
     envVars:
-      # Application - CRITICAL FIX: Add APP_KEY
+      # Application - CRITICAL: APP_KEY must be here
       - key: APP_KEY
-        generateValue: true  # Render generates a random base64 key
+        generateValue: true
       - key: APP_NAME
         value: Mzizination
       - key: APP_ENV
         value: production
       - key: APP_DEBUG
-        value: false
+        value: true
       - key: APP_URL
         value: https://mzizination2.onrender.com
       - key: APP_TIMEZONE
@@ -34,7 +29,7 @@ services:
       - key: APP_LOCALE
         value: en
       
-      # Database
+      # Database - Auto-populated by Render from PostgreSQL service
       - key: DB_CONNECTION
         value: pgsql
       - key: DB_HOST
@@ -58,7 +53,7 @@ services:
           name: mzizination-db
           property: password
       
-      # Cache & Session
+      # Cache & Session - Optimized for Render
       - key: CACHE_DRIVER
         value: array
       - key: SESSION_DRIVER
@@ -67,8 +62,16 @@ services:
         value: sync
       - key: BROADCAST_DRIVER
         value: log
+      - key: FILESYSTEM_DISK
+        value: local
       
-      # M-Pesa Daraja (Primary)
+      # Logging
+      - key: LOG_CHANNEL
+        value: stack
+      - key: LOG_LEVEL
+        value: debug
+      
+      # M-Pesa Daraja Configuration (for testing)
       - key: MPESA_SANDBOX
         value: true
       - key: MPESA_CONSUMER_KEY
@@ -84,13 +87,13 @@ services:
       - key: MPESA_INITIATOR_PASSWORD
         scope: build
       
-      # Paystack (Backup)
+      # Paystack Configuration (Optional)
       - key: PAYSTACK_PUBLIC_KEY
         scope: build
       - key: PAYSTACK_SECRET_KEY
         scope: build
       
-      # Payments
+      # Payment Limits
       - key: WITHDRAWAL_MIN_AMOUNT
         value: "100"
       - key: WITHDRAWAL_MAX_AMOUNT
@@ -101,24 +104,14 @@ services:
         value: "10"
       - key: DEPOSIT_MAX_AMOUNT
         value: "70000"
-      
-      # Logging
-      - key: LOG_CHANNEL
-        value: stack
-      - key: LOG_LEVEL
-        value: debug
     
     plan: starter
     numInstances: 1
     maxNumInstances: 3
     minNumInstances: 1
     
-    # Health check for Laravel
-    healthCheckPath: /
-    
     preDeployCommand: "sh scripts/pre-deploy.sh"
 
-# Post-deployment hooks to run migrations and cache
 hooks:
   postDeploy: |
     set -e
