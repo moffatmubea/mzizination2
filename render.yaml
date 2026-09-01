@@ -10,11 +10,17 @@ services:
     name: mzizination-casino
     env: php
     phpVersion: 8.2
-    startCommand: "sh scripts/start.sh"
+    
+    # ⚠️ CRITICAL FIX: Use Render's native PHP + nginx setup
+    # DO NOT use startCommand: "sh scripts/start.sh" - Render ignores it
+    # Instead, Render will automatically start nginx + php-fpm
+    
     buildCommand: "sh scripts/build.sh"
     
     envVars:
-      # Application
+      # Application - CRITICAL FIX: Add APP_KEY
+      - key: APP_KEY
+        generateValue: true  # Render generates a random base64 key
       - key: APP_NAME
         value: Mzizination
       - key: APP_ENV
@@ -22,7 +28,7 @@ services:
       - key: APP_DEBUG
         value: false
       - key: APP_URL
-        scope: build
+        value: https://mzizination2.onrender.com
       - key: APP_TIMEZONE
         value: Africa/Nairobi
       - key: APP_LOCALE
@@ -107,10 +113,12 @@ services:
     maxNumInstances: 3
     minNumInstances: 1
     
-    healthCheckPath: /health
+    # Health check for Laravel
+    healthCheckPath: /
     
     preDeployCommand: "sh scripts/pre-deploy.sh"
 
+# Post-deployment hooks to run migrations and cache
 hooks:
   postDeploy: |
     set -e
